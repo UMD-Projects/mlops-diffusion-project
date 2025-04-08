@@ -1,0 +1,6 @@
+datasets
+diffusers
+transformers
+flaxdiff
+jax[tpu]
+flax[all]
