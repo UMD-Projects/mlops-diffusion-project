@@ -417,9 +417,21 @@ def main(args):
     print(f"Training on {CONFIG['dataset']['name']} dataset with {batches} samples")
     
 
-    data['test'] = data['train']
-    data['test_len'] = data['train_len']
+    # data['test'] = data['train']
+    # data['test_len'] = data['train_len']
     
+    # Construct a validation set by the prompts
+    val_prompts = ['water tulip', ' a water lily', ' a water lily', ' a photo of a rose', ' a photo of a rose', ' a water lily', ' a water lily', ' a photo of a marigold', ' a photo of a marigold', ' a photo of a marigold', ' a water lily', ' a photo of a sunflower', ' a photo of a lotus', ' columbine', ' columbine', ' an orchid', ' an orchid', ' an orchid', ' a water lily', ' a water lily', ' a water lily', ' columbine', ' columbine', ' a photo of a sunflower', ' a photo of a sunflower', ' a photo of a sunflower', ' a photo of a lotus', ' a photo of a lotus', ' a photo of a marigold', ' a photo of a marigold', ' a photo of a rose', ' a photo of a rose', ' a photo of a rose', ' orange dahlia', ' orange dahlia', ' a lenten rose', ' a lenten rose', ' a water lily', ' a water lily', ' a water lily', ' a water lily', ' an orchid', ' an orchid', ' an orchid', ' hard-leaved pocket orchid', ' bird of paradise', ' bird of paradise', ' a photo of a lovely rose', ' a photo of a lovely rose', ' a photo of a globe-flower', ' a photo of a globe-flower', ' a photo of a lovely rose', ' a photo of a lovely rose', ' a photo of a ruby-lipped cattleya', ' a photo of a ruby-lipped cattleya', ' a photo of a lovely rose', ' a water lily', ' a osteospermum', ' a osteospermum', ' a water lily', ' a water lily', ' a water lily', ' a red rose', ' a red rose']
+
+    def get_val_dataset(batch_size=8):
+        for i in range(0, len(val_prompts), batch_size):
+            prompts = val_prompts[i:i + batch_size]
+            tokens = text_encoder.tokenize(prompts)
+            yield tokens
+
+    data['test'] = get_val_dataset
+    data['test_len'] = len(val_prompts)
+
     final_state = trainer.fit(
         data, 
         batches, 
@@ -437,7 +449,7 @@ New -->
 
 python3 training/training.py --dataset=oxford_flowers102\
             --checkpoint_dir='./checkpoints/' --checkpoint_fs='local'\
-            --epochs=40 --batch_size=32 --image_size=128 \
+            --epochs=2000 --batch_size=32 --image_size=128 \
             --learning_rate=2e-4 --num_res_blocks=2 \
             --use_self_and_cross=True --dtype=bfloat16 --precision=default --attention_heads=8\
             --experiment_name='dataset-{dataset}/image_size-{image_size}/batch-{batch_size}/schd-{noise_schedule}/dtype-{dtype}/arch-{architecture}/lr-{learning_rate}/resblks-{num_res_blocks}/emb-{emb_features}/pure-attn-{only_pure_attention}/'\
