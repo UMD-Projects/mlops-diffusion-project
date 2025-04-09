@@ -7,7 +7,10 @@ from flaxdiff.models.simple_unet import Unet
 from flaxdiff.models.simple_vit import UViT
 import jax.experimental.pallas.ops.tpu.flash_attention
 from flaxdiff.predictors import VPredictionTransform, EpsilonPredictionTransform, DiffusionPredictionTransform, DirectPredictionTransform, KarrasPredictionTransform
-from flaxdiff.schedulers import CosineNoiseSchedule, NoiseScheduler, GeneralizedNoiseScheduler, KarrasVENoiseScheduler, EDMNoiseScheduler
+from flaxdiff.schedulers import CosineNoiseScheduler, NoiseScheduler, GeneralizedNoiseScheduler, KarrasVENoiseScheduler, EDMNoiseScheduler
+
+jax.distributed.initialize()
+from flaxdiff.samplers.euler import EulerAncestralSampler
 import struct as st
 import flax
 import tqdm
@@ -87,9 +90,9 @@ parser.add_argument('--GRAIN_READ_BUFFER_SIZE', type=int,
 parser.add_argument('--GRAIN_WORKER_BUFFER_SIZE', type=int,
                     default=50, help='Grain worker buffer size')
 
-parser.add_argument('--batch_size', type=int, default=64, help='Batch size')
+parser.add_argument('--batch_size', type=int, default=32, help='Batch size')
 parser.add_argument('--image_size', type=int, default=128, help='Image size')
-parser.add_argument('--epochs', type=int, default=20, help='Number of epochs')
+parser.add_argument('--epochs', type=int, default=100, help='Number of epochs')
 parser.add_argument('--steps_per_epoch', type=int,
                     default=None, help='Steps per epoch')
 parser.add_argument('--dataset', type=str,
@@ -106,7 +109,7 @@ parser.add_argument('--feature_depths', type=int, nargs='+', default=[64, 128, 2
 parser.add_argument('--attention_heads', type=int, default=8, help='Number of attention heads')
 parser.add_argument('--flash_attention', type=boolean_string, default=False, help='Use Flash Attention')
 parser.add_argument('--use_projection', type=boolean_string, default=False, help='Use projection')
-parser.add_argument('--use_self_and_cross', type=boolean_string, default=False, help='Use self and cross attention')
+parser.add_argument('--use_self_and_cross', type=boolean_string, default=True, help='Use self and cross attention')
 parser.add_argument('--only_pure_attention', type=boolean_string, default=True, help='Use only pure attention or proper transformer in the attention blocks') 
 parser.add_argument('--norm_groups', type=int, default=8, help='Number of normalization groups. 0 for RMSNorm')
 
@@ -157,6 +160,9 @@ parser.add_argument('--clip_grads', type=float, default=0, help='Clip gradients 
 parser.add_argument('--add_residualblock_output', type=boolean_string, default=False, help='Add a residual block stage to the final output')
 parser.add_argument('--kernel_init', type=None, default=1.0, help='Kernel initialization value')
 
+parser.add_argument('--wandb_project', type=str, default='mlops-msml605-project', help='Wandb project name')
+parser.add_argument('--wandb_entity', type=str, default='umd-projects', help='Wandb entity name')
+
 def main(args):
     resource.setrlimit(
         resource.RLIMIT_CORE,
@@ -166,8 +172,8 @@ def main(args):
         resource.RLIMIT_OFILE,
         (65535, 65535))
 
-    print("Initializing JAX")
-    jax.distributed.initialize()
+    # print("Initializing JAX")
+    # jax.distributed.initialize()
 
     # jax.config.update('jax_threefry_partitionable', True)
     print(f"Number of devices: {jax.device_count()}")
@@ -343,7 +349,7 @@ def main(args):
         model_config['kernel_init'] = partial(kernel_init, scale=float(args.kernel_init))
         print("Using custom kernel initialization with scale", args.kernel_init)
 
-    cosine_schedule = CosineNoiseSchedule(1000, beta_end=1)
+    cosine_schedule = CosineNoiseScheduler(1000, beta_end=1)
     karas_ve_schedule = KarrasVENoiseScheduler(
         1, sigma_max=80, rho=7, sigma_data=0.5)
     edm_schedule = EDMNoiseScheduler(1, sigma_max=80, rho=7, sigma_data=0.5)
@@ -379,7 +385,8 @@ def main(args):
         )
 
     wandb_config = {
-        "project": "flaxdiff",
+        "project": args.wandb_project,
+        "entity": args.wandb_entity,
         "config": CONFIG,
         "name": experiment_name,
     }
@@ -410,7 +417,13 @@ def main(args):
     batches = batches if args.steps_per_epoch is None else args.steps_per_epoch
     print(f"Training on {CONFIG['dataset']['name']} dataset with {batches} samples")
     
-    final_state = trainer.fit(data, batches, epochs=CONFIG['epochs'])
+    final_state = trainer.fit(
+        data, 
+        batches, 
+        epochs=CONFIG['epochs'], 
+        sampler_class=EulerAncestralSampler, 
+        sampling_noise_schedule=karas_ve_schedule,
+    )
     
 if __name__ == '__main__':
     args = parser.parse_args()
@@ -419,4 +432,11 @@ if __name__ == '__main__':
 """
 New -->
 
+python3 training/training.py --dataset=oxford_flowers102\
+            --checkpoint_dir='./checkpoints/' --checkpoint_fs='local'\
+            --epochs=40 --batch_size=32 --image_size=128 \
+            --learning_rate=2e-4 --num_res_blocks=2 \
+            --use_self_and_cross=True --dtype=bfloat16 --precision=default --attention_heads=8\
+            --experiment_name='dataset-{dataset}/image_size-{image_size}/batch-{batch_size}/schd-{noise_schedule}/dtype-{dtype}/arch-{architecture}/lr-{learning_rate}/resblks-{num_res_blocks}/emb-{emb_features}/pure-attn-{only_pure_attention}/'\
+            --optimizer=adamw --use_dynamic_scale=True --norm_groups 0 --only_pure_attention=True --use_projection=False
 """
