@@ -371,8 +371,10 @@ def main(args):
             name="Diffusion_SDE_VE_TEXT", date=datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
         )
         
-    experiment_name = experiment_name.format(**CONFIG['arguments'])
-    experiment_name = experiment_name.format(date=datetime.now().strftime("%Y-%m-%d_%H:%M:%S"), arguments_hash=arguments_hash)
+    conf_args = CONFIG['arguments']
+    conf_args['date'] = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    conf_args['arguments_hash'] = arguments_hash
+    experiment_name = experiment_name.format(**conf_args)
         
     print("Experiment_Name:", experiment_name)
 
