@@ -130,6 +130,8 @@ parser.add_argument('--distributed_training', type=boolean_string, default=True,
 parser.add_argument('--experiment_name', type=str, default=None, help='Experiment name, would be generated if not provided')
 parser.add_argument('--load_from_checkpoint', type=str,
                     default=None, help='Load from the best previously stored checkpoint. The checkpoint path should be provided')
+parser.add_argument('--resume_last_run', type=boolean_string,
+                    default=False, help='Resume the last run from the experiment name')
 parser.add_argument('--dataset_seed', type=int, default=0, help='Dataset starting seed')
 
 parser.add_argument('--dataset_test', type=boolean_string,
@@ -322,6 +324,9 @@ def main(args):
     
     if args.architecture == 'uvit':
         model_config['emb_features'] = 768
+        
+    sorted_args_json = json.dumps(vars(args), sort_keys=True)
+    arguments_hash = hash(sorted_args_json)
     
     CONFIG = {
         "model": model_config,
@@ -342,6 +347,7 @@ def main(args):
         "arguments": vars(args),
         "autoencoder": args.autoencoder,
         "autoencoder_opts": args.autoencoder_opts,
+        "arguments_hash": arguments_hash,
     }
     
     if args.kernel_init is not None:
@@ -355,12 +361,18 @@ def main(args):
 
     if args.experiment_name and args.experiment_name != "":
         experiment_name = args.experiment_name
+        if not args.resume_last_run:
+            experiment_name = f"{experiment_name}/{"arguments_hash-{arguments_hash}/date-{date}"}"
+        else:
+            # TODO: Add logic to load the last run from wandb
+            pass
     else:
         experiment_name = "{name}_{date}".format(
             name="Diffusion_SDE_VE_TEXT", date=datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
         )
         
     experiment_name = experiment_name.format(**CONFIG['arguments'])
+    experiment_name = experiment_name.format(date=datetime.now().strftime("%Y-%m-%d_%H:%M:%S"), arguments_hash=arguments_hash)
         
     print("Experiment_Name:", experiment_name)
 
@@ -452,6 +464,6 @@ python3 training/training.py --dataset=oxford_flowers102\
             --epochs=2000 --batch_size=32 --image_size=128 \
             --learning_rate=2e-4 --num_res_blocks=2 \
             --use_self_and_cross=True --dtype=bfloat16 --precision=default --attention_heads=8\
-            --experiment_name='dataset-{dataset}/image_size-{image_size}/batch-{batch_size}/schd-{noise_schedule}/dtype-{dtype}/arch-{architecture}/lr-{learning_rate}/resblks-{num_res_blocks}/emb-{emb_features}/pure-attn-{only_pure_attention}/'\
+            --experiment_name='dataset-{dataset}/image_size-{image_size}/batch-{batch_size}/schd-{noise_schedule}/dtype-{dtype}/arch-{architecture}/lr-{learning_rate}/resblks-{num_res_blocks}/emb-{emb_features}/pure-attn-{only_pure_attention}'\
             --optimizer=adamw --use_dynamic_scale=True --norm_groups 0 --only_pure_attention=True --use_projection=False
 """

@@ -1,7 +1,7 @@
 method: bayes
 metric:
   goal: minimize
-  name: t
+  name: train/avg_loss
 parameters:
   learning_rate:
     max: 0.001
@@ -15,14 +15,6 @@ parameters:
     values:
       - 32
     distribution: categorical
-  learning_rate_warmup_steps:
-    max: 20000
-    min: 5000
-    distribution: int_uniform
-  learning_rate_decay_epochs:
-    max: 2
-    min: 1
-    distribution: int_uniform
   add_residualblock_output:
     values:
       - "true"
@@ -42,18 +34,10 @@ parameters:
       - "true"
       - "false"
     distribution: categorical
-  learning_rate_peak:
-    max: 0.0006
-    min: 0.00015
-    distribution: uniform
   use_dynamic_scale:
     values:
       - "true"
     distribution: categorical
-  learning_rate_end:
-    max: 0.0004
-    min: 0.0001
-    distribution: uniform
   experiment_name:
     values:
       - sweep-dataset-{dataset}/image_size-{image_size}/batch-{batch_size}/schd-{noise_schedule}/dtype-{dtype}/arch-{architecture}/lr-{learning_rate}/resblks-{num_res_blocks}/emb-{emb_features}/pure-attn-{only_pure_attention}/
