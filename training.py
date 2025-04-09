@@ -9,7 +9,6 @@ import jax.experimental.pallas.ops.tpu.flash_attention
 from flaxdiff.predictors import VPredictionTransform, EpsilonPredictionTransform, DiffusionPredictionTransform, DirectPredictionTransform, KarrasPredictionTransform
 from flaxdiff.schedulers import CosineNoiseScheduler, NoiseScheduler, GeneralizedNoiseScheduler, KarrasVENoiseScheduler, EDMNoiseScheduler
 
-jax.distributed.initialize()
 from flaxdiff.samplers.euler import EulerAncestralSampler
 import struct as st
 import flax
@@ -172,8 +171,8 @@ def main(args):
         resource.RLIMIT_OFILE,
         (65535, 65535))
 
-    # print("Initializing JAX")
-    # jax.distributed.initialize()
+    print("Initializing JAX")
+    jax.distributed.initialize()
 
     # jax.config.update('jax_threefry_partitionable', True)
     print(f"Number of devices: {jax.device_count()}")
@@ -416,6 +415,10 @@ def main(args):
         print("Distributed Training enabled")
     batches = batches if args.steps_per_epoch is None else args.steps_per_epoch
     print(f"Training on {CONFIG['dataset']['name']} dataset with {batches} samples")
+    
+
+    data['test'] = data['train']
+    data['test_len'] = data['train_len']
     
     final_state = trainer.fit(
         data, 
