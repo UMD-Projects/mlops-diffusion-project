@@ -6,13 +6,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir fastapi uvicorn jax jaxlib flax optax pillow matplotlib
+
 
 WORKDIR /app
-COPY inference_server.py .
+
+COPY . /app
+
+RUN pip install --no-cache-dir fastapi uvicorn jax jaxlib flax optax pillow matplotlib wandb pydantic flaxdiff transformers einops diffusers
+
+# # Copy requirements.txt first (important for caching)
+# COPY requirements.txt .
+
+# # Install Python dependencies
+# RUN pip install --no-cache-dir -r requirements.txt
+
+#COPY inference_mashup.py .
 
 # Expose port 8000 (the port used by Uvicorn).
 EXPOSE 8000
 
 # Command to run the server using Uvicorn.
-CMD ["uvicorn", "inference_server:app", "--host", "0.0.0.0", "--port", "8000"]
+
+
+CMD ["uvicorn", "inference_mashup:app", "--host", "0.0.0.0", "--port", "8000"]
+
