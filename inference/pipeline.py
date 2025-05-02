@@ -25,6 +25,7 @@ from flaxdiff.inference.utils import parse_config, load_from_wandb_run, load_fro
 @dataclass
 class InferencePipeline:
     """Inference pipeline for a general model."""
+    name: str = None
     model: nn.Module = None
     state: SimpleTrainState = None
     best_state: SimpleTrainState = None
@@ -75,7 +76,7 @@ class DiffusionInferencePipeline(InferencePipeline):
         Returns:
             DiffusionInferencePipeline instance
         """
-        states, config = load_from_wandb_run(
+        states, config, run = load_from_wandb_run(
             wandb_run,
             project=project,
             entity=entity,
@@ -93,6 +94,7 @@ class DiffusionInferencePipeline(InferencePipeline):
             state=state,
             best_state=best_state,
             rngstate=RandomMarkovState(jax.random.PRNGKey(42)),
+            run=run,
         )
         return pipeline
     
@@ -117,7 +119,7 @@ class DiffusionInferencePipeline(InferencePipeline):
         Returns:
             DiffusionInferencePipeline instance
         """
-        states, config = load_from_wandb_registry(
+        states, config, run = load_from_wandb_registry(
             modelname=modelname,
             project=project,
             entity=entity,
@@ -137,6 +139,7 @@ class DiffusionInferencePipeline(InferencePipeline):
             state=state,
             best_state=best_state,
             rngstate=RandomMarkovState(jax.random.PRNGKey(42)),
+            run=run,
         )
         return pipeline
             
@@ -147,11 +150,13 @@ class DiffusionInferencePipeline(InferencePipeline):
         state: Dict[str, Any],
         best_state: Optional[Dict[str, Any]] = None,
         rngstate: Optional[RandomMarkovState] = None,
+        run=None,
     ):
         if rngstate is None:
             rngstate = RandomMarkovState(jax.random.PRNGKey(42))
         # Build and return pipeline
         return cls(
+            name=run.name if run else None,
             model=config['model'],
             state=state,
             best_state=best_state,
