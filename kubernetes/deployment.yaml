@@ -1,0 +1,26 @@
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: diffusion-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: diffusion
+  template:
+    metadata:
+      labels:
+        app: diffusion
+    spec:
+      containers:
+      - name: api
+        image: sharvarigokhale/diffusion-inference-pipeline:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: WANDB_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: wandb-api-key
+              key: WANDB_API_KEY
