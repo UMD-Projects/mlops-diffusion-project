@@ -10,7 +10,7 @@ API_BASE = "http://34.122.168.182"
 st.title("🧠 Diffusion Inference Streamlit")
 
 prompt = st.text_input("Enter your prompt:")
-model_name = st.text_input("Model name (optional):", value="diffusion-oxford_flowers102-res256")
+model_name = st.text_input("Model name (optional):", value="diffusion-oxford_flowers102-res128-sweep-d4es07fm")
 generate = st.button("Generate Image")
 
 if generate and prompt:
@@ -25,26 +25,35 @@ if generate and prompt:
 
             # Poll for result
             with st.spinner("Waiting for result..."):
-                for _ in range(30):
-                    result = requests.get(f"{API_BASE}/result/{job_id}")
+                progress = st.progress(0)
+                success = False
+
+                for i in range(30):
+                    result = requests.get(f"{API_BASE}/result/{job_id}?t={time.time()}")  # cache busting
                     data = result.json()
 
                     if data.get("status") == "completed":
                         images_b64 = data.get("result", [])
-                        if images_b64:
-                            for i, image_b64 in enumerate(images_b64):
-                                img_data = base64.b64decode(image_b64)
+                        if isinstance(images_b64, list) and images_b64:
+                            for idx, img_str in enumerate(images_b64):
+                                img_data = base64.b64decode(img_str)
                                 image = Image.open(BytesIO(img_data))
-                                st.image(image, caption=f"Generated Image {i+1}")
+                                st.image(image, caption=f"Generated Image {idx + 1}")
+                            success = True
                         else:
-                            st.error("No image data returned.")
+                            st.warning("No image returned.")
+                            success = True
                         break
+
                     elif data.get("status") == "running":
+                        progress.progress((i + 1) / 30)
                         time.sleep(2)
                     else:
                         st.warning("Unexpected status or error.")
+                        success = True
                         break
-                else:
+
+                if not success:
                     st.warning("Job is still running. Try again later.")
         else:
             st.error("Failed to submit job.")
