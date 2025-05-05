@@ -43,7 +43,7 @@ def generate(req: GenerateRequest):
             print(f"[Job {job_id}] Model loaded")
 
             # Fallback if autoencoder is missing
-            if pipeline.autoencoder is None:
+            if not hasattr(pipeline.autoencoder, 'decode'):
                 print(f"[Job {job_id}] Falling back to hardcoded Hugging Face VAE: pcuenq/sd-vae-ft-mse-flax")
                 from flaxdiff.models.autoencoder.diffusers import StableDiffusionVAE
                 try:
