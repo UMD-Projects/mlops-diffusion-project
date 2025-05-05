@@ -9,7 +9,6 @@ from pydantic import BaseModel
 from flaxdiff.inference.pipeline import DiffusionInferencePipeline
 from PIL import Image
 import numpy as np
-import json
 
 # Force JAX to CPU
 os.environ["JAX_PLATFORMS"] = os.getenv("JAX_PLATFORMS", "cpu")
@@ -43,33 +42,17 @@ def generate(req: GenerateRequest):
             )
             print(f"[Job {job_id}] Model loaded")
 
-            # Patch in the autoencoder if missing
+            # Fallback if autoencoder is missing
             if pipeline.autoencoder is None:
+                print(f"[Job {job_id}] Falling back to hardcoded Hugging Face VAE: pcuenq/sd-vae-ft-mse-flax")
                 from flaxdiff.models.autoencoder.diffusers import StableDiffusionVAE
-
-                ae_opts = None
                 try:
-                    ae_opts_raw = pipeline.config.get("autoencoder_opts", None)
-                    if isinstance(ae_opts_raw, str):
-                        ae_opts = json.loads(ae_opts_raw)
-                    elif isinstance(ae_opts_raw, dict):
-                        ae_opts = ae_opts_raw
+                    pipeline.autoencoder = StableDiffusionVAE(modelname="pcuenq/sd-vae-ft-mse-flax")
+                    print(f"[Job {job_id}] Hugging Face VAE loaded successfully.")
                 except Exception as e:
-                    print(f"[Job {job_id}] Warning: Failed to parse autoencoder_opts: {e}")
-                    ae_opts = None
+                    raise RuntimeError(f"Failed to load hardcoded VAE: {e}")
 
-                if ae_opts:
-                    ae_modelname = ae_opts.get("modelname")
-                    if ae_modelname:
-                        print(f"[Job {job_id}] Loading VAE from {ae_modelname}")
-                        pipeline.autoencoder = StableDiffusionVAE(modelname=ae_modelname)
-                    else:
-                        raise RuntimeError("Missing 'modelname' in autoencoder_opts.")
-                else:
-                    fallback_ae_model = "diffusion-sdvae-coco-res256"
-                    print(f"[Job {job_id}] No autoencoder_opts found. Using fallback VAE: {fallback_ae_model}")
-                    pipeline.autoencoder = StableDiffusionVAE(modelname=fallback_ae_model)
-
+            # Run sampling
             samples = pipeline.generate_samples(
                 num_samples=req.num_samples or len(req.prompts),
                 resolution=req.resolution,
@@ -109,7 +92,6 @@ def generate(req: GenerateRequest):
 
     threading.Thread(target=run_generation).start()
     return {"job_id": job_id, "status": "running"}
-
 
 @app.get("/result/{job_id}")
 def get_result(job_id: str):
