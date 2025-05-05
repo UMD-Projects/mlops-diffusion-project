@@ -47,15 +47,16 @@ def generate(req: GenerateRequest):
             if pipeline.autoencoder is None:
                 from flaxdiff.models.autoencoder.diffusers import StableDiffusionVAE
 
-                ae_opts_raw = pipeline.config.get("autoencoder_opts", None)
                 ae_opts = None
-                if isinstance(ae_opts_raw, str):
-                    try:
+                try:
+                    ae_opts_raw = pipeline.config.get("autoencoder_opts", None)
+                    if isinstance(ae_opts_raw, str):
                         ae_opts = json.loads(ae_opts_raw)
-                    except json.JSONDecodeError:
-                        raise RuntimeError("autoencoder_opts is a string but not valid JSON")
-                elif isinstance(ae_opts_raw, dict):
-                    ae_opts = ae_opts_raw
+                    elif isinstance(ae_opts_raw, dict):
+                        ae_opts = ae_opts_raw
+                except Exception as e:
+                    print(f"[Job {job_id}] Warning: Failed to parse autoencoder_opts: {e}")
+                    ae_opts = None
 
                 if ae_opts:
                     ae_modelname = ae_opts.get("modelname")
