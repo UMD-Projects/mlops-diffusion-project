@@ -58,7 +58,7 @@ def generate(req: GenerateRequest):
                 resolution=req.resolution,
                 diffusion_steps=req.diffusion_steps,
                 guidance_scale=req.guidance_scale,
-                start_step=0,
+                start_step=1000,
                 conditioning_data=req.prompts,
             )
 
