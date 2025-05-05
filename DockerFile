@@ -12,7 +12,7 @@ WORKDIR /app
 
 COPY . /app
 
-RUN pip install --no-cache-dir fastapi uvicorn jax jaxlib flax optax pillow matplotlib wandb pydantic flaxdiff transformers einops diffusers
+RUN pip install --no-cache-dir fastapi uvicorn jax jaxlib flax optax pillow matplotlib wandb pydantic flaxdiff transformers einops diffusers huggingface_hub[hf_xet]
 
 # # Copy requirements.txt first (important for caching)
 # COPY requirements.txt .
