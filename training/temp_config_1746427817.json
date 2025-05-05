@@ -1,0 +1,32 @@
+{
+  "workerPoolSpecs": [
+    {
+      "machineSpec": {
+        "machineType": "cloud-tpu",
+        "acceleratorType": "TPU_V3",
+        "acceleratorCount": 8
+      },
+      "replicaCount": 1,
+      "containerSpec": {
+        "imageUri": "europe-west4-docker.pkg.dev/verdant-current-452602-s1/flaxdiff-docker-repo/flaxdiff-tpu-trainer:latest",
+        "command": [
+          "wandb"
+        ],
+        "args": [
+          "agent",
+          "--count=1",
+          "umd-projects/mlops-msml605-project/3s98m11b"
+        ],
+        "env": [
+          {
+            "name": "WANDB_API_KEY",
+            "value": "fdcf7523bb77b87138aa6bc45da5a28a7ac64270"
+          }
+        ]
+      }
+    }
+  ],
+  "scheduling": {
+    "strategy": "SPOT"
+  }
+}

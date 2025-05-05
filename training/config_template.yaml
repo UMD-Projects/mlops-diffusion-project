@@ -1,0 +1,31 @@
+# config_jobspec_template.yaml (Contains ONLY CustomJobSpec fields)
+
+# Service account for the job (optional, part of CustomJobSpec)
+# serviceAccount: SERVICE_ACCOUNT_PLACEHOLDER
+
+# Worker pool specs (required part of CustomJobSpec)
+workerPoolSpecs:
+- machineSpec:
+    machineType: cloud-tpu
+    acceleratorType: ACCELERATOR_TYPE_PLACEHOLDER
+    acceleratorCount: ACCELERATOR_COUNT_PLACEHOLDER # For tpu-v3-8 VM count is 1
+  replicaCount: 1
+  # Container spec (required part of workerPoolSpecs)
+  containerSpec:
+    imageUri: IMAGE_URI_PLACEHOLDER
+    command: ["wandb"]
+    args:
+    - agent
+    - --count=1
+    - SWEEP_ID_PLACEHOLDER
+    env:
+    - name: WANDB_API_KEY
+      value: WANDB_API_KEY_PLACEHOLDER
+
+# You could add other CustomJobSpec fields here if needed, like:
+# baseOutputDirectory:
+#   outputUriPrefix: gs://your-bucket/output/
+scheduling:
+  strategy: SPOT
+#   timeout: 7200s
+#   restartJobOnWorkerRestart: false
