@@ -41,6 +41,7 @@ def generate(req: GenerateRequest):
                 entity='umd-projects'
             )
             print(f"[Job {job_id}] Model loaded")
+            print(f"[Job {job_id}] Input config: {pipeline.config.get('input_config', {})}")
 
             # Fallback if autoencoder is missing
             if not hasattr(pipeline.autoencoder, 'decode'):
