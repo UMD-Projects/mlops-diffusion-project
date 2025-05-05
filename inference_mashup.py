@@ -42,6 +42,14 @@ def generate(req: GenerateRequest):
             )
             print(f"[Job {job_id}] Model loaded")
 
+            # 🔽 NEW: Load the StableDiffusion-compatible VAE
+            from flaxdiff.models.autoencoder.diffusers import StableDiffusionVAE
+            vae = StableDiffusionVAE(modelname="pcuenq/sd-vae-ft-mse-flax")
+            print(f"[Job {job_id}] Loaded VAE")
+
+            # 🔽 Inject VAE into pipeline
+            pipeline.set_autoencoder(vae)
+
             samples = pipeline.generate_samples(
                 num_samples=req.num_samples or len(req.prompts),
                 resolution=req.resolution,
