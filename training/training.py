@@ -1,5 +1,5 @@
 import jax
-jax.config.update("jax_enable_x64", True)
+# jax.config.update("jax_enable_x64", True)
 
 from typing import Any, Tuple, Mapping, Callable, List, Dict
 from functools import partial
@@ -8,6 +8,8 @@ import jax.experimental.multihost_utils
 from flaxdiff.models.common import kernel_init
 from flaxdiff.models.simple_unet import Unet
 from flaxdiff.models.simple_vit import UViT
+from flaxdiff.models.simple_dit import SimpleDiT
+from flaxdiff.models.simple_mmdit import SimpleMMDiT, HierarchicalMMDiT
 import jax.experimental.pallas.ops.tpu.flash_attention
 from flaxdiff.predictors import VPredictionTransform, EpsilonPredictionTransform, DiffusionPredictionTransform, DirectPredictionTransform, KarrasPredictionTransform
 from flaxdiff.schedulers import CosineNoiseScheduler, NoiseScheduler, GeneralizedNoiseScheduler, KarrasVENoiseScheduler, EDMNoiseScheduler
@@ -17,7 +19,7 @@ import struct as st
 import flax
 import tqdm
 import jax.numpy as jnp
-
+import re
 import optax
 import time
 import os
@@ -86,11 +88,11 @@ parser.add_argument('--GRAIN_WORKER_COUNT', type=int,
 # parser.add_argument('--GRAIN_WORKER_COUNT', type=int,
 #                     default=32, help='Number of grain workers')
 parser.add_argument('--GRAIN_READ_THREAD_COUNT', type=int,
-                    default=128, help='Number of grain read threads')
+                    default=140, help='Number of grain read threads')
 parser.add_argument('--GRAIN_READ_BUFFER_SIZE', type=int,
-                    default=80, help='Grain read buffer size')
+                    default=96, help='Grain read buffer size')
 parser.add_argument('--GRAIN_WORKER_BUFFER_SIZE', type=int,
-                    default=50, help='Grain worker buffer size')
+                    default=128, help='Grain worker buffer size')
 
 parser.add_argument('--batch_size', type=int, default=32, help='Batch size')
 parser.add_argument('--image_size', type=int, default=128, help='Image size')
@@ -108,7 +110,7 @@ parser.add_argument('--noise_schedule', type=str, default='edm',
                     choices=['cosine', 'karras', 'edm'], help='Noise schedule')
 
 parser.add_argument('--architecture', type=str, 
-                    choices=["unet", "uvit", "diffusers_unet_simple"], 
+                    choices=["unet", "uvit", "diffusers_unet_simple", "simple_dit", "simple_mmdit", "hierarchical_mmdit"], 
                     default="unet", help='Architecture to use')
 parser.add_argument('--emb_features', type=int, default=256, help='Embedding features')
 parser.add_argument('--feature_depths', type=int, nargs='+', default=[64, 128, 256, 512], help='Feature depths')
@@ -129,6 +131,7 @@ parser.add_argument('--patch_size', type=int, default=16, help='Patch size for t
 parser.add_argument('--num_layers', type=int, default=12, help='Number of layers in the transformer if using UViT')
 parser.add_argument('--num_heads', type=int, default=12, help='Number of heads in the transformer if using UViT')
 parser.add_argument('--mlp_ratio', type=int, default=4, help='MLP ratio in the transformer if using UViT')
+parser.add_argument('--use_hilbert', type=boolean_string, default=False, help='Use Hilbert patch reordering for the transformer if using UViT')
 
 parser.add_argument('--dtype', type=str, default=None, help='dtype to use')
 parser.add_argument('--precision', type=str, default=None, help='precision to use', choices=['high', 'default', 'highest', 'None', None])
@@ -137,8 +140,8 @@ parser.add_argument('--distributed_training', type=boolean_string, default=True,
 parser.add_argument('--experiment_name', type=str, default=None, help='Experiment name, would be generated if not provided')
 parser.add_argument('--load_from_checkpoint', type=str,
                     default=None, help='Load from the best previously stored checkpoint. The checkpoint path should be provided')
-parser.add_argument('--resume_last_run', type=boolean_string,
-                    default=False, help='Resume the last run from the experiment name')
+parser.add_argument('--resume_last_run', type=str,
+                    default=None, help='Resume the last run from the experiment name')
 parser.add_argument('--dataset_seed', type=int, default=0, help='Dataset starting seed')
 
 parser.add_argument('--dataset_test', type=boolean_string,
@@ -174,6 +177,7 @@ parser.add_argument('--wandb_project', type=str, default='mlops-msml605-project'
 parser.add_argument('--wandb_entity', type=str, default='umd-projects', help='Wandb entity name')
 
 parser.add_argument('--val_metrics', type=str, nargs='+', default=['clip'], help='Validation metrics to use')
+parser.add_argument('--best_tracker_metric', type=str, default='val/clip_similarity', help='Best tracker metric to use')
 
 # parser.add_argument('--wandb_project', type=str, default='flaxdiff', help='Wandb project name')
 # parser.add_argument('--wandb_entity', type=str, default='ashishkumar4', help='Wandb entity name')
@@ -331,8 +335,47 @@ def main(args):
                 "num_layers":  args.num_layers,
                 "num_heads":  args.num_heads,
                 "dropout_rate": 0.1,
-                "use_projection": False,
                 "add_residualblock_output": args.add_residualblock_output,
+                "use_flash_attention": args.flash_attention,
+                "use_self_and_cross": args.use_self_and_cross,
+                "use_hilbert": args.use_hilbert,
+            },
+        },
+        "simple_dit": {
+            "class": SimpleDiT,
+            "kwargs": {
+                "patch_size":  args.patch_size,
+                "num_layers":  args.num_layers,
+                "num_heads":  args.num_heads,
+                "dropout_rate": 0.1,
+                "use_flash_attention": args.flash_attention,
+                "mlp_ratio": args.mlp_ratio,
+                "use_hilbert": args.use_hilbert,
+            },
+        },
+        "simple_mmdit": {
+            "class": SimpleMMDiT,
+            "kwargs": {
+                "patch_size":  args.patch_size,
+                "num_layers":  args.num_layers,
+                "num_heads":  args.num_heads,
+                "dropout_rate": 0.1,
+                "use_flash_attention": args.flash_attention,
+                "mlp_ratio": args.mlp_ratio,
+                "use_hilbert": args.use_hilbert,
+            },
+        },
+        "hierarchical_mmdit": {
+            "class": HierarchicalMMDiT,
+            "kwargs": {
+                "base_patch_size": args.patch_size // 2,  # Use half the patch size for base
+                "emb_features": (args.emb_features - 256, args.emb_features, args.emb_features + 256),  # Default dims per stage
+                "num_layers": (args.num_layers // 3, args.num_layers // 2, args.num_layers),  # Default layers per stage
+                "num_heads": (args.num_heads - 2, args.num_heads, args.num_heads + 2),  # Default heads per stage
+                "dropout_rate": 0.1,
+                "use_flash_attention": args.flash_attention,
+                "mlp_ratio": args.mlp_ratio,
+                "use_hilbert": args.use_hilbert,
             },
         },
         "diffusers_unet_simple": {
@@ -381,7 +424,7 @@ def main(args):
     # Validation metrics 
     if args.val_metrics is not None:
         if 'clip' in args.val_metrics:
-            from .val_metrics import get_clip_metric
+            from flaxdiff.metrics.images import get_clip_metric
             print("Using CLIP metric for validation")
             eval_metrics.append(get_clip_metric())
     
@@ -410,26 +453,30 @@ def main(args):
     karas_ve_schedule = KarrasVENoiseScheduler(
         1, sigma_max=80, rho=7, sigma_data=0.5)
     edm_schedule = EDMNoiseScheduler(1, sigma_max=80, rho=7, sigma_data=0.5)
-
-    if args.experiment_name and args.experiment_name != "":
-        experiment_name = args.experiment_name
-        if not args.resume_last_run:
-            experiment_name = f"{experiment_name}/" + "arguments_hash-{arguments_hash}/date-{date}"
-        else:
-            # TODO: Add logic to load the last run from wandb
-            pass
-    else:
-        experiment_name = "{name}_{date}".format(
-            name="Diffusion_SDE_VE_TEXT", date=datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-        )
     
-    if autoencoder is not None:
-        experiment_name = f"LDM-{experiment_name}"
-        
-    conf_args = CONFIG['arguments']
-    conf_args['date'] = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-    conf_args['arguments_hash'] = arguments_hash
-    experiment_name = experiment_name.format(**conf_args)
+    if args.experiment_name is not None:
+        experiment_name = args.experiment_name
+    else:
+        experiment_name = "manual-dataset-{dataset}/image_size-{image_size}/batch-{batch_size}/schd-{noise_schedule}/dtype-{dtype}/arch-{architecture}/lr-{learning_rate}/resblks-{num_res_blocks}/emb-{emb_features}/pure-attn-{only_pure_attention}"
+    
+    # Check if format strings are required using regex
+    pattern = r"\{.+?\}"
+    if re.search(pattern, experiment_name):
+        experiment_name = f"{experiment_name}/" + "arguments_hash-{arguments_hash}/date-{date}"
+        if autoencoder is not None:
+            experiment_name = f"LDM-{experiment_name}"
+                
+        if args.use_hilbert:
+            experiment_name = f"Hilbert-{experiment_name}"
+                
+        conf_args = CONFIG['arguments']
+        conf_args['date'] = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+        conf_args['arguments_hash'] = arguments_hash
+        # Format the string with the arguments
+        experiment_name = experiment_name.format(**vars(args))
+    else:
+        # If no format strings, just use the provided name
+        experiment_name = args.experiment_name
         
     print("Experiment_Name:", experiment_name)
 
@@ -466,6 +513,9 @@ def main(args):
         "name": experiment_name,
     }
     
+    if args.resume_last_run is not None:
+        wandb_config['id'] = args.resume_last_run
+    
     start_time = time.time()
     
     trainer = GeneralDiffusionTrainer(
@@ -485,6 +535,7 @@ def main(args):
         native_resolution=IMAGE_SIZE,
         max_checkpoints_to_keep=args.max_checkpoints_to_keep,
         eval_metrics=eval_metrics,
+        best_tracker_metric=args.best_tracker_metric,
     )
     
     if trainer.distributed_training:

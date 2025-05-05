@@ -1,7 +1,7 @@
 method: bayes
 metric:
   goal: minimize
-  name: train/avg_loss
+  name: val/clip_similarity
 parameters:
   learning_rate:
     max: 0.001
