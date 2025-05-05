@@ -10,19 +10,19 @@ from flaxdiff.inference.pipeline import DiffusionInferencePipeline
 from PIL import Image
 import numpy as np
 
-# Force JAX to CPU
+# Force JAX to CPU (remove this if you later enable TPU support)
 os.environ["JAX_PLATFORMS"] = os.getenv("JAX_PLATFORMS", "cpu")
 
 app = FastAPI()
 job_store = {}
 
-DEFAULT_MODEL_NAME = 'diffusion-laiona_coco-res256'
+DEFAULT_MODEL_NAME = 'diffusion-oxford_flowers102-res128-sweep-d4es07fm'
 
 class GenerateRequest(BaseModel):
     prompts: List[str]
     model_name: Optional[str] = None
     num_samples: Optional[int] = 1
-    resolution: Optional[int] = 64
+    resolution: Optional[int] = 128
     diffusion_steps: Optional[int] = 25
     guidance_scale: Optional[float] = 3.0
 
@@ -41,25 +41,13 @@ def generate(req: GenerateRequest):
                 entity='umd-projects'
             )
             print(f"[Job {job_id}] Model loaded")
-            print(f"[Job {job_id}] Input config: {pipeline.config.get('input_config', {})}")
 
-            # Fallback if autoencoder is missing
-            if not hasattr(pipeline.autoencoder, 'decode'):
-                print(f"[Job {job_id}] Falling back to hardcoded Hugging Face VAE: pcuenq/sd-vae-ft-mse-flax")
-                from flaxdiff.models.autoencoder.diffusers import StableDiffusionVAE
-                try:
-                    pipeline.autoencoder = StableDiffusionVAE(modelname="pcuenq/sd-vae-ft-mse-flax")
-                    print(f"[Job {job_id}] Hugging Face VAE loaded successfully.")
-                except Exception as e:
-                    raise RuntimeError(f"Failed to load hardcoded VAE: {e}")
-
-            # Run sampling
             samples = pipeline.generate_samples(
                 num_samples=req.num_samples or len(req.prompts),
                 resolution=req.resolution,
                 diffusion_steps=req.diffusion_steps,
                 guidance_scale=req.guidance_scale,
-                start_step=1000,
+                start_step=0,
                 conditioning_data=req.prompts,
             )
 
