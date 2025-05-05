@@ -66,7 +66,9 @@ def generate(req: GenerateRequest):
                     else:
                         raise RuntimeError("Missing 'modelname' in autoencoder_opts.")
                 else:
-                    raise RuntimeError("No autoencoder or autoencoder_opts provided.")
+                    fallback_ae_model = "diffusion-sdvae-coco-res256"
+                    print(f"[Job {job_id}] No autoencoder_opts found. Using fallback VAE: {fallback_ae_model}")
+                    pipeline.autoencoder = StableDiffusionVAE(modelname=fallback_ae_model)
 
             samples = pipeline.generate_samples(
                 num_samples=req.num_samples or len(req.prompts),
