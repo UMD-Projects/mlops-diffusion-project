@@ -11,10 +11,27 @@ import numpy as np
 
 from flaxdiff.inference.pipeline import DiffusionInferencePipeline
 from flaxdiff.samplers.euler import EulerAncestralSampler
+from flaxdiff.samplers.euler import EulerSampler
+from flaxdiff.samplers.ddim import DDIMSampler
+from flaxdiff.samplers.heun_sampler import HeunSampler
+from flaxdiff.samplers.rk4_sampler import RK4Sampler
+from flaxdiff.samplers.ddpm import DDPMSampler, SimpleDDPMSampler
 
 app = FastAPI()
 job_store = {}
 pipeline_store = {}
+
+SAMPLER_CLASSES = {
+    "euler": EulerAncestralSampler,
+    "euler_ancestral": EulerAncestralSampler,
+    "euler_sampler": EulerSampler,
+    "ddim": DDIMSampler,
+    "heun": HeunSampler,
+    "rk4": RK4Sampler,
+    "ddpm": DDPMSampler,
+    "simple_ddpm": SimpleDDPMSampler,
+}
+    
 
 # Request schema
 class GenerateRequest(BaseModel):
@@ -25,6 +42,7 @@ class GenerateRequest(BaseModel):
     diffusion_steps: Optional[int] = 200
     guidance_scale: Optional[float] = 3.0
     start_step: Optional[int] = 1000
+    sampler_class: Optional[str] = "euler_ancestral"
 
 @app.post("/generate")
 def generate(req: GenerateRequest):
@@ -51,7 +69,7 @@ def generate(req: GenerateRequest):
                 diffusion_steps=req.diffusion_steps,
                 guidance_scale=req.guidance_scale,
                 start_step=req.start_step,
-                sampler_class=EulerAncestralSampler,
+                sampler_class=SAMPLER_CLASSES.get(req.sampler_class, EulerAncestralSampler),
                 conditioning_data=req.prompts
             )
 
