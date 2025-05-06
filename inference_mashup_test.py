@@ -119,3 +119,4 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run("inference_mashup:app", host="0.0.0.0", port=8000)
 
+#5d3e2c483799a61f13af152d1e547b83bbe935b8

@@ -48,14 +48,15 @@ def generate(req: GenerateRequest):
                 entity="umd-projects",
                 version="latest"
             )
+            tokens = pipeline.input_config.conditions[0].encoder.tokenize(req.prompts)
 
             samples = pipeline.generate_samples(
                 num_samples=req.num_samples or len(req.prompts),
                 resolution=req.resolution,
                 diffusion_steps=req.diffusion_steps,
                 guidance_scale=req.guidance_scale,
-                conditioning_data=req.prompts
-                conditioning_data=req.prompts
+                conditioning_data=tokens
+
             )
 
             images_b64 = []
@@ -65,7 +66,7 @@ def generate(req: GenerateRequest):
                     img_np = np.array(img) if not isinstance(img, np.ndarray) else img
                     if img_np.ndim == 2:
                         img_np = np.stack([img_np] * 3, axis=-1)
-                        img_np = np.stack([img_np] * 3, axis=-1)
+
 
                     img_np = np.clip(img_np, -1.0, 1.0)
                     img_uint8 = ((img_np + 1.0) * 127.5).astype("uint8")
