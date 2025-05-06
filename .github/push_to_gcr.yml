@@ -1,0 +1,83 @@
+name: Build and Push Docker Image to GCR on Release
+
+on:
+  release:
+    types: [created]
+
+env:
+  GCR_HOSTNAME: gcr.io
+  # --- TODO: Configure these variables for your specific image ---
+  # Replace 'your-gcp-project-id' with your actual GCP Project ID.
+  # You can set it directly here or use a GitHub secret like ${{ secrets.GCP_PROJECT_ID }}
+  GCP_PROJECT_ID: 'your-gcp-project-id'
+  
+  # Replace 'your-image-name' with the desired name for your Docker image in GCR.
+  # Example for the inference service: 'mlops-diffusion-inference'
+  IMAGE_NAME: 'your-image-name'
+  
+  # Replace with the path to your Dockerfile, relative to the repository root.
+  # Example: If your repo is 'mlops-diffusion-project' and Dockerfile is at 'mlops-diffusion-project/inference/Dockerfile',
+  # this would be 'inference/Dockerfile'.
+  DOCKERFILE_PATH: 'path/to/your/Dockerfile'
+  
+  # Replace with the build context path for your Dockerfile, relative to the repository root.
+  # Example: For 'inference/Dockerfile', this is often 'inference'.
+  BUILD_CONTEXT: 'path/to/your/build/context'
+
+jobs:
+  build-and-push-to-gcr:
+    name: Build and Push to GCR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write' # Required for Workload Identity Federation
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: 'google-github-actions/auth@v2'
+        with:
+          # --- TODO: Configure ONE of the authentication methods below ---
+
+          # Method 1: Workload Identity Federation (Recommended)
+          # Replace with your Workload Identity Pool, Provider, and Service Account email.
+          # Ensure your service account has roles/artifactregistry.writer or roles/storage.admin for GCR.
+          # workload_identity_provider: 'projects/${{ env.GCP_PROJECT_ID }}/locations/global/workloadIdentityPools/your-pool-id/providers/your-provider-id'
+          # service_account: 'your-service-account-email@${{ env.GCP_PROJECT_ID }}.iam.gserviceaccount.com'
+          
+          # Method 2: Service Account Key JSON (Less Secure)
+          # Create a GitHub secret named GCP_SA_KEY with your service account key JSON.
+          # Ensure the service account has roles/artifactregistry.writer or roles/storage.admin for GCR.
+          credentials_json: '${{ secrets.GCP_SA_KEY }}' # Uncomment this line and comment out WIF above if using SA Key
+
+      - name: Set up Cloud SDK
+        uses: 'google-github-actions/setup-gcloud@v2'
+        # The project_id is usually picked up from the auth step.
+        # with:
+        #   project_id: ${{ env.GCP_PROJECT_ID }}
+
+      - name: Configure Docker for GCR
+        run: gcloud auth configure-docker ${{ env.GCR_HOSTNAME }} --quiet
+
+      - name: Build and Push Docker Image
+        env:
+          # Make release tag available to the script
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          IMAGE_TAG_WITH_RELEASE="${{ env.GCR_HOSTNAME }}/${{ env.GCP_PROJECT_ID }}/${{ env.IMAGE_NAME }}:${RELEASE_TAG}"
+          IMAGE_TAG_LATEST="${{ env.GCR_HOSTNAME }}/${{ env.GCP_PROJECT_ID }}/${{ env.IMAGE_NAME }}:latest"
+
+          echo "Building image with tags: $IMAGE_TAG_WITH_RELEASE, $IMAGE_TAG_LATEST"
+          echo "Dockerfile: ${{ env.DOCKERFILE_PATH }}"
+          echo "Build Context: ${{ env.BUILD_CONTEXT }}"
+
+          docker build -t "$IMAGE_TAG_WITH_RELEASE" -t "$IMAGE_TAG_LATEST" -f "${{ env.DOCKERFILE_PATH }}" "${{ env.BUILD_CONTEXT }}"
+          
+          echo "Pushing image: $IMAGE_TAG_WITH_RELEASE"
+          docker push "$IMAGE_TAG_WITH_RELEASE"
+          
+          echo "Pushing image: $IMAGE_TAG_LATEST"
+          docker push "$IMAGE_TAG_LATEST"

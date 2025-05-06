@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: diffusion-api
 spec:
-  replicas: 1
+  replicas: 1 # Or your desired number
   selector:
     matchLabels:
       app: diffusion
@@ -12,22 +12,23 @@ spec:
       labels:
         app: diffusion
     spec:
+      nodeSelector:
+        cloud.google.com/gke-nodepool: high-cpu-pool # <--- ADD THIS
       containers:
-        - name: api
-          image: gcr.io/umd-project-456120/diffusion-api
-          imagePullPolicy: Always
-          resources:
-            requests:
-              memory: "4Gi"
-              cpu: "1"
-            limits:
-              memory: "8Gi"
-              cpu: "2"
-          ports:
-            - containerPort: 8000
-          env:
-            - name: WANDB_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: wandb-api-key
-                  key: WANDB_API_KEY
+      - name: api
+        image: gcr.io/umd-project-456120/diffusion-api:latest
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            cpu: "8"
+            memory: "16Gi"
+          limits:
+            cpu: "16" # Limit can be higher than request
+            memory: "16Gi"
+        env:
+        - name: WANDB_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: wandb-api-key
+              key: WANDB_API_KEY

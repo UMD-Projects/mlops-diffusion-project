@@ -4,13 +4,15 @@ import time
 from PIL import Image
 from io import BytesIO
 import base64
+from dotenv import load_dotenv
+import os
 
-API_BASE = "http://localhost:8000"
+API_BASE = os.getenv("API_BASE", "http://diffusion-service:80")
 
 st.title("🧠 Diffusion Inference Streamlit")
 
 prompt = st.text_input("Enter your prompt:")
-model_name = st.text_input("Model name (optional):", value="diffusion-oxford_flowers102-res128-sweep-d4es07fm")
+model_name = st.text_input("Model name (optional):", value="diffusion-laiona_coco-res256-sweep-wgjsicqf")
 generate = st.button("Generate Image")
 
 if generate and prompt:
@@ -24,11 +26,12 @@ if generate and prompt:
             st.success(f"Job submitted! Job ID: `{job_id}`")
 
             # Poll for result
-            with st.spinner("Waiting for result..."):
+            with st.spinner("Waiting for result (up to 8 minutes)..."):
                 progress = st.progress(0)
                 success = False
+                total_attempts = 240  # 240 x 2s = 8 minutes
 
-                for i in range(30):
+                for i in range(total_attempts):
                     result = requests.get(f"{API_BASE}/result/{job_id}?t={time.time()}")  # cache busting
                     data = result.json()
 
@@ -46,7 +49,7 @@ if generate and prompt:
                         break
 
                     elif data.get("status") == "running":
-                        progress.progress((i + 1) / 30)
+                        progress.progress((i + 1) / total_attempts)
                         time.sleep(2)
                     else:
                         st.warning("Unexpected status or error.")
@@ -55,5 +58,6 @@ if generate and prompt:
 
                 if not success:
                     st.warning("Job is still running. Try again later.")
+                    st.info(f"You can recheck the job status later using Job ID: `{job_id}`")
         else:
             st.error("Failed to submit job.")

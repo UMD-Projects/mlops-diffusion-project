@@ -19,7 +19,16 @@ from flaxdiff.samplers.ddpm import DDPMSampler, SimpleDDPMSampler
 
 app = FastAPI()
 job_store = {}
-pipeline_store = {}
+
+# Preload the pipeline from wandb registry
+pipeline_store = {
+    "diffusion-laiona_coco-res256-sweep-wgjsicqf": DiffusionInferencePipeline.from_wandb_registry(
+                    modelname="diffusion-laiona_coco-res256-sweep-wgjsicqf",
+                    project="mlops-msml605-project",
+                    entity="umd-projects",
+                    #version=req.version
+                ),
+}
 
 SAMPLER_CLASSES = {
     "euler": EulerAncestralSampler,
@@ -60,6 +69,8 @@ def generate(req: GenerateRequest):
                     entity="umd-projects",
                     #version=req.version
                 )
+                pipeline_store[req.model_name] = pipeline
+                print(f"[Job {job_id}] Pipeline loaded for model: {req.model_name}")
             else:
                 print(f"[Job {job_id}] Using cached pipeline for model: {req.model_name}")
                 
@@ -107,3 +118,7 @@ def get_result(job_id: str):
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return {"job_id": job_id, **job}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
