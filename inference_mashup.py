@@ -6,23 +6,25 @@ import threading
 from typing import List, Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from flaxdiff.inference.pipeline import DiffusionInferencePipeline
 from PIL import Image
 import numpy as np
+import jax
 
-# Force JAX to CPU (remove this if you later enable TPU support)
+from flaxdiff.utils import RandomMarkovState
+from flaxdiff.inference.pipeline import DiffusionInferencePipeline
+
+# Force JAX to CPU
 os.environ["JAX_PLATFORMS"] = os.getenv("JAX_PLATFORMS", "cpu")
 
 app = FastAPI()
 job_store = {}
 
-DEFAULT_MODEL_NAME = 'diffusion-oxford_flowers102-res128-sweep-d4es07fm'
-
+# Request model
 class GenerateRequest(BaseModel):
     prompts: List[str]
-    model_name: Optional[str] = None
+    model_name: Optional[str] = "diffusion-oxford_flowers102-res256"
     num_samples: Optional[int] = 1
-    resolution: Optional[int] = 128
+    resolution: Optional[int] = 256
     diffusion_steps: Optional[int] = 25
     guidance_scale: Optional[float] = 3.0
 
@@ -33,30 +35,22 @@ def generate(req: GenerateRequest):
 
     def run_generation():
         try:
-            model_name = req.model_name or DEFAULT_MODEL_NAME
-            print(f"[Job {job_id}] Loading model: {model_name}")
+            print(f"[Job {job_id}] Generating with prompts: {req.prompts}")
+            print(f"[Job {job_id}] Loading model: {req.model_name}")
+
             pipeline = DiffusionInferencePipeline.from_wandb_registry(
-                modelname=model_name,
-                project='wandb-registry-model',
-                entity='umd-projects'
+                modelname=req.model_name,
+                project="mlops-msml605-project",
+                entity="umd-projects",
+                version="latest"
             )
-            print(f"[Job {job_id}] Model loaded")
-
-            # 🔽 NEW: Load the StableDiffusion-compatible VAE
-            from flaxdiff.models.autoencoder.diffusers import StableDiffusionVAE
-            vae = StableDiffusionVAE(modelname="pcuenq/sd-vae-ft-mse-flax")
-            print(f"[Job {job_id}] Loaded VAE")
-
-            # 🔽 Inject VAE into pipeline
-            pipeline.set_autoencoder(vae)
 
             samples = pipeline.generate_samples(
                 num_samples=req.num_samples or len(req.prompts),
                 resolution=req.resolution,
                 diffusion_steps=req.diffusion_steps,
                 guidance_scale=req.guidance_scale,
-                start_step=0,
-                conditioning_data=req.prompts,
+                conditioning_data=req.prompts
             )
 
             images_b64 = []
@@ -65,7 +59,7 @@ def generate(req: GenerateRequest):
                 try:
                     img_np = np.array(img) if not isinstance(img, np.ndarray) else img
                     if img_np.ndim == 2:
-                        img_np = np.stack([img_np]*3, axis=-1)
+                        img_np = np.stack([img_np] * 3, axis=-1)
 
                     img_np = np.clip(img_np, -1.0, 1.0)
                     img_uint8 = ((img_np + 1.0) * 127.5).astype("uint8")
