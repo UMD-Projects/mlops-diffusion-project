@@ -12,18 +12,9 @@ spec:
       labels:
         app: diffusion
     spec:
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: cloud.google.com/gke-nodepool
-                    operator: In
-                    values:
-                      - high-mem-pool
       containers:
         - name: api
-          image: us-central1-docker.pkg.dev/mlops-msml605-project/diffusion-repo/diffusion-inference-pipeline:v2
+          image: gcr.io/umd-project-456120/diffusion-api
           imagePullPolicy: Always
           resources:
             requests:
