@@ -48,7 +48,12 @@ def generate(req: GenerateRequest):
                 entity="umd-projects",
                 version="latest"
             )
-            tokens = pipeline.input_config.conditions[0].encoder.tokenize(req.prompts)
+            num_prompts = len(req.prompts)
+            num_samples = req.num_samples or num_prompts
+
+            # Repeat prompts to match num_samples
+            prompts = (req.prompts * ((num_samples + num_prompts - 1) // num_prompts))[:num_samples]
+            tokens = pipeline.input_config.conditions[0].encoder.tokenize(prompts)
 
             samples = pipeline.generate_samples(
                 num_samples=req.num_samples or len(req.prompts),
