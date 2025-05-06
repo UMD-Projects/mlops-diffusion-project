@@ -50,17 +50,23 @@ def generate(req: GenerateRequest):
             )
 
             images_b64 = []
-            for img in samples:
-                # Ensure the image is a NumPy array and clean it
-                img_np = np.array(img)
-                img_np = np.nan_to_num(img_np, nan=0.0)             # Replace NaNs with 0
-                img_np = np.clip(img_np, -1.0, 1.0)                 # Clamp values to [-1, 1]
-                img_uint8 = ((img_np * 127.5) + 127.5).astype(np.uint8)  # Convert to [0, 255] uint8
+            for i, img in enumerate(samples):
+                try:
+                    img_np = np.array(img)
+                    if img_np.ndim == 2:
+                        img_np = np.stack([img_np] * 3, axis=-1)
 
-                # Encode to base64
-                buf = io.BytesIO()
-                Image.fromarray(img_uint8).save(buf, format="PNG")
-                images_b64.append(base64.b64encode(buf.getvalue()).decode())
+                    img_np = np.nan_to_num(img_np, nan=0.0)
+                    img_uint8 = np.clip((img_np * 127.5 + 127.5), 0, 255).astype(np.uint8)
+
+                    buf = io.BytesIO()
+                    Image.fromarray(img_uint8).save(buf, format="PNG")
+                    img_b64 = base64.b64encode(buf.getvalue()).decode()
+                    images_b64.append(img_b64)
+                except Exception as e:
+                    print(f"[Job {job_id}] Failed to process image {i}: {e}")
+
+
 
             print(f"[Job {job_id}] Number of images generated: {len(images_b64)}")
             job_store[job_id] = {"status": "completed", "result": images_b64}
