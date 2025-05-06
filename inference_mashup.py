@@ -19,7 +19,7 @@ pipeline_store = {}
 # Request schema
 class GenerateRequest(BaseModel):
     prompts: List[str]
-    model_name: Optional[str] = "diffusion-oxford_flowers102-res128-sweep-d4es07fm"
+    model_name: Optional[str] = 'diffusion-laiona_coco-res256'
     #version: Optional[str] = "best"
     resolution: Optional[int] = 256
     diffusion_steps: Optional[int] = 200
