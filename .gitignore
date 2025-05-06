@@ -3,3 +3,6 @@ checkpoints
 __pycache__/
 wandb
 artifacts/
+.venv
+.DS_Store
+.git

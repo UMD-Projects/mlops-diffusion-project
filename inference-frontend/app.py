@@ -5,7 +5,7 @@ from PIL import Image
 from io import BytesIO
 import base64
 
-API_BASE = "http://34.122.168.182"
+API_BASE = "http://localhost:8000"
 
 st.title("🧠 Diffusion Inference Streamlit")
 
