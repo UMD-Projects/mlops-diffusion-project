@@ -51,12 +51,18 @@ def generate(req: GenerateRequest):
 
             images_b64 = []
             for img in samples:
+                # Ensure the image is a NumPy array and clean it
                 img_np = np.array(img)
-                img_uint8 = (img_np * 127.5 + 127.5).clip(0, 255).astype(np.uint8)
+                img_np = np.nan_to_num(img_np, nan=0.0)             # Replace NaNs with 0
+                img_np = np.clip(img_np, -1.0, 1.0)                 # Clamp values to [-1, 1]
+                img_uint8 = ((img_np * 127.5) + 127.5).astype(np.uint8)  # Convert to [0, 255] uint8
+
+                # Encode to base64
                 buf = io.BytesIO()
                 Image.fromarray(img_uint8).save(buf, format="PNG")
                 images_b64.append(base64.b64encode(buf.getvalue()).decode())
 
+            print(f"[Job {job_id}] Number of images generated: {len(images_b64)}")
             job_store[job_id] = {"status": "completed", "result": images_b64}
 
         except Exception as e:
