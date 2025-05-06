@@ -53,14 +53,22 @@ def generate(req: GenerateRequest):
 
             # Repeat prompts to match num_samples
             prompts = (req.prompts * ((num_samples + num_prompts - 1) // num_prompts))[:num_samples]
-            tokens = pipeline.input_config.conditions[0].encoder.tokenize(prompts)
+                        # Tokenize conditioned prompts
+            cond_tokens = pipeline.input_config.conditions[0].encoder.tokenize(prompts)
+            uncond_prompts = [""] * len(prompts)
+            uncond_tokens = pipeline.input_config.conditions[0].encoder.tokenize(uncond_prompts)
+
+            conditioning_data = {
+                "tokens": cond_tokens,
+                "uncond_tokens": uncond_tokens
+            }
 
             samples = pipeline.generate_samples(
                 num_samples=req.num_samples or len(req.prompts),
                 resolution=req.resolution,
                 diffusion_steps=req.diffusion_steps,
                 guidance_scale=req.guidance_scale,
-                conditioning_data=tokens
+                conditioning_data=conditioning_data
 
             )
 
