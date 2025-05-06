@@ -9,20 +9,20 @@ env:
   # --- TODO: Configure these variables for your specific image ---
   # Replace 'your-gcp-project-id' with your actual GCP Project ID.
   # You can set it directly here or use a GitHub secret like ${{ secrets.GCP_PROJECT_ID }}
-  GCP_PROJECT_ID: 'your-gcp-project-id'
+  GCP_PROJECT_ID: 'umd-project-456120'
   
   # Replace 'your-image-name' with the desired name for your Docker image in GCR.
   # Example for the inference service: 'mlops-diffusion-inference'
-  IMAGE_NAME: 'your-image-name'
+  IMAGE_NAME: 'diffusion-api:latest'
   
   # Replace with the path to your Dockerfile, relative to the repository root.
   # Example: If your repo is 'mlops-diffusion-project' and Dockerfile is at 'mlops-diffusion-project/inference/Dockerfile',
   # this would be 'inference/Dockerfile'.
-  DOCKERFILE_PATH: 'path/to/your/Dockerfile'
+  DOCKERFILE_PATH: 'inference/Dockerfile'
   
   # Replace with the build context path for your Dockerfile, relative to the repository root.
   # Example: For 'inference/Dockerfile', this is often 'inference'.
-  BUILD_CONTEXT: 'path/to/your/build/context'
+  BUILD_CONTEXT: 'inference'
 
 jobs:
   build-and-push-to-gcr:

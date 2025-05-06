@@ -27,6 +27,7 @@ pipeline_store = {
                     project="mlops-msml605-project",
                     entity="umd-projects",
                     #version=req.version
+                    version="best"
                 ),
 }
 
@@ -68,6 +69,7 @@ def generate(req: GenerateRequest):
                     project="mlops-msml605-project",
                     entity="umd-projects",
                     #version=req.version
+                    version="best"
                 )
                 pipeline_store[req.model_name] = pipeline
                 print(f"[Job {job_id}] Pipeline loaded for model: {req.model_name}")

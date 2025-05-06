@@ -21,7 +21,7 @@ spec:
         - containerPort: 8000
         resources:
           requests:
-            cpu: "8"
+            cpu: "7500m"
             memory: "16Gi"
           limits:
             cpu: "16" # Limit can be higher than request
