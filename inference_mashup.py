@@ -10,14 +10,10 @@ from PIL import Image
 import numpy as np
 import jax
 
-from flaxdiff.utils import parse_config, RandomMarkovState
-from flaxdiff.inference.pipeline import DiffusionInferencePipeline
-import jax
-
-from flaxdiff.utils import RandomMarkovState
+from flaxdiff.utils import defaultTextEncodeModel
 from flaxdiff.inference.pipeline import DiffusionInferencePipeline
 
-# Force JAX to CPU (remove this if you later enable TPU support)
+# Force JAX to CPU (adjust/remove for GPU/TPU support)
 os.environ["JAX_PLATFORMS"] = os.getenv("JAX_PLATFORMS", "cpu")
 
 app = FastAPI()
@@ -48,28 +44,21 @@ def generate(req: GenerateRequest):
                 entity="umd-projects",
                 version="latest"
             )
+
+            # Use defaultTextEncodeModel to ensure correct tokenization
+            text_encoder = defaultTextEncodeModel()
             num_prompts = len(req.prompts)
             num_samples = req.num_samples or num_prompts
 
-            # Repeat prompts to match num_samples
             prompts = (req.prompts * ((num_samples + num_prompts - 1) // num_prompts))[:num_samples]
-                        # Tokenize conditioned prompts
-            cond_tokens = pipeline.input_config.conditions[0].encoder.tokenize(prompts)
-            uncond_prompts = [""] * len(prompts)
-            uncond_tokens = pipeline.input_config.conditions[0].encoder.tokenize(uncond_prompts)
-
-            conditioning_data = {
-                "tokens": cond_tokens,
-                "uncond_tokens": uncond_tokens
-            }
+            tokens = text_encoder.tokenize(prompts)
 
             samples = pipeline.generate_samples(
-                num_samples=req.num_samples or len(req.prompts),
+                num_samples=num_samples,
                 resolution=req.resolution,
                 diffusion_steps=req.diffusion_steps,
                 guidance_scale=req.guidance_scale,
-                conditioning_data=conditioning_data
-
+                conditioning_data=tokens
             )
 
             images_b64 = []
