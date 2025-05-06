@@ -10,10 +10,14 @@ from PIL import Image
 import numpy as np
 import jax
 
+from flaxdiff.utils import parse_config, RandomMarkovState
+from flaxdiff.inference.pipeline import DiffusionInferencePipeline
+import jax
+
 from flaxdiff.utils import RandomMarkovState
 from flaxdiff.inference.pipeline import DiffusionInferencePipeline
 
-# Force JAX to CPU
+# Force JAX to CPU (remove this if you later enable TPU support)
 os.environ["JAX_PLATFORMS"] = os.getenv("JAX_PLATFORMS", "cpu")
 
 app = FastAPI()
@@ -51,6 +55,7 @@ def generate(req: GenerateRequest):
                 diffusion_steps=req.diffusion_steps,
                 guidance_scale=req.guidance_scale,
                 conditioning_data=req.prompts
+                conditioning_data=req.prompts
             )
 
             images_b64 = []
@@ -59,6 +64,7 @@ def generate(req: GenerateRequest):
                 try:
                     img_np = np.array(img) if not isinstance(img, np.ndarray) else img
                     if img_np.ndim == 2:
+                        img_np = np.stack([img_np] * 3, axis=-1)
                         img_np = np.stack([img_np] * 3, axis=-1)
 
                     img_np = np.clip(img_np, -1.0, 1.0)
