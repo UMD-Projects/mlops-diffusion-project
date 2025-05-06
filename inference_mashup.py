@@ -66,8 +66,6 @@ def generate(req: GenerateRequest):
                     img_np = np.array(img) if not isinstance(img, np.ndarray) else img
                     if img_np.ndim == 2:
                         img_np = np.stack([img_np] * 3, axis=-1)
-
-
                     img_np = np.clip(img_np, -1.0, 1.0)
                     img_uint8 = ((img_np + 1.0) * 127.5).astype("uint8")
                     img_uint8 = np.nan_to_num(img_uint8, nan=0).astype("uint8")
